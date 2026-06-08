@@ -7,8 +7,21 @@ from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
 from database import init_db
 from handlers import router
+from aiohttp import web
 
 load_dotenv()
+
+async def handle(request):
+    return web.Response(text="Bot is running on Render!")
+
+async def dummy_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
 
 async def main():
     # Set up logging
@@ -29,6 +42,7 @@ async def main():
     dp.include_router(router)
     
     logging.info("Bot ishga tushdi...")
+    await dummy_server()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

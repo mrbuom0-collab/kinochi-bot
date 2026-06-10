@@ -53,6 +53,28 @@ async def btn_broadcast(message: Message, state: FSMContext):
     await message.answer("✉️ Xabaringizni yuboring. Barcha turdagi xabarlar qo'llab-quvvatlanadi.\n\nBekor qilish uchun /cancel ni bosing.")
     await state.set_state(AdminStates.broadcast)
 
+@router.message(Command("cancel"), AdminStates.broadcast)
+async def cmd_cancel_broadcast(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Xabar yuborish bekor qilindi.")
+
+@router.message(AdminStates.broadcast)
+async def handle_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await state.clear()
+    users = get_all_users()
+    sent = 0
+    await message.answer(f"⏳ Xabar yuborish boshlandi. Jami foydalanuvchilar: {len(users)} ta...")
+    for user_id in users:
+        try:
+            await message.send_copy(chat_id=user_id)
+            sent += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            pass
+    await message.answer(f"✅ Xabar yuborish yakunlandi!\n\nMuvaffaqiyatli yetib bordi: {sent} ta")
+
 # Admin sends a video -> save it to DB
 @router.message(F.video)
 async def handle_video(message: Message):
@@ -176,27 +198,6 @@ async def cb_admin_broadcast(call: CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.broadcast)
     await call.answer()
 
-@router.message(Command("cancel"), AdminStates.broadcast)
-async def cmd_cancel_broadcast(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer("❌ Xabar yuborish bekor qilindi.")
-
-@router.message(AdminStates.broadcast)
-async def handle_broadcast(message: Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
-    await state.clear()
-    users = get_all_users()
-    sent = 0
-    await message.answer(f"⏳ Xabar yuborish boshlandi. Jami foydalanuvchilar: {len(users)} ta...")
-    for user_id in users:
-        try:
-            await message.send_copy(chat_id=user_id)
-            sent += 1
-            await asyncio.sleep(0.05)
-        except Exception:
-            pass
-    await message.answer(f"✅ Xabar yuborish yakunlandi!\n\nMuvaffaqiyatli yetib bordi: {sent} ta")
 
 @router.callback_query(F.data.startswith("del_"))
 async def cb_delete(call: CallbackQuery):

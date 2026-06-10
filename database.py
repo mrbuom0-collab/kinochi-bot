@@ -73,3 +73,11 @@ def get_stats():
     movies_count = cursor.fetchone()[0]
     conn.close()
     return users_count, movies_count
+
+def get_all_users():
+    conn = sqlite3.connect('movies.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM users")
+    users = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return users

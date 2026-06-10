@@ -1,8 +1,11 @@
 import os
 from aiogram import Router, F
+import asyncio
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from database import add_movie, get_movie, delete_movie, increment_views, add_user, get_stats
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from database import add_movie, get_movie, delete_movie, increment_views, add_user, get_stats, get_all_users
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,6 +17,9 @@ except ValueError:
     ADMIN_ID = 0
 
 CHANNEL_ID = os.getenv("CHANNEL_ID", "-1003980224305")
+
+class AdminStates(StatesGroup):
+    broadcast = State()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
@@ -113,18 +119,60 @@ async def cmd_delete(message: Message):
     else:
         await message.answer(f"❌ {movie_id} - raqamli kino topilmadi.")
 
-@router.message(Command("stat"))
-async def cmd_stat(message: Message):
+@router.message(Command("admin"))
+async def cmd_admin(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
-    
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 Statistika", callback_data="admin_stat")],
+        [InlineKeyboardButton(text="✉️ Xabar yuborish", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="❌ Yopish", callback_data="admin_close")]
+    ])
+    await message.answer("🛠 <b>Admin Panelga xush kelibsiz!</b>\n\nQuyidagi menyudan kerakli bo'limni tanlang:", reply_markup=markup)
+
+@router.callback_query(F.data == "admin_stat")
+async def cb_admin_stat(call: CallbackQuery):
+    if call.from_user.id != ADMIN_ID:
+        return
     users_count, movies_count = get_stats()
-    text = (
-        f"📊 <b>Bot Statistikasi:</b>\n\n"
-        f"👥 Umumiy foydalanuvchilar: {users_count} ta\n"
-        f"🎬 Jami kinolar: {movies_count} ta"
-    )
-    await message.answer(text)
+    text = f"📊 <b>Bot Statistikasi:</b>\n\n👥 Umumiy foydalanuvchilar: {users_count} ta\n🎬 Jami kinolar: {movies_count} ta"
+    await call.answer(text, show_alert=True)
+
+@router.callback_query(F.data == "admin_close")
+async def cb_admin_close(call: CallbackQuery):
+    if call.from_user.id != ADMIN_ID:
+        return
+    await call.message.delete()
+
+@router.callback_query(F.data == "admin_broadcast")
+async def cb_admin_broadcast(call: CallbackQuery, state: FSMContext):
+    if call.from_user.id != ADMIN_ID:
+        return
+    await call.message.answer("✉️ Xabaringizni yuboring. Barcha turdagi xabarlar (rasm, video, matn) qo'llab-quvvatlanadi.\n\nBekor qilish uchun /cancel ni bosing.")
+    await state.set_state(AdminStates.broadcast)
+    await call.answer()
+
+@router.message(Command("cancel"), AdminStates.broadcast)
+async def cmd_cancel_broadcast(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Xabar yuborish bekor qilindi.")
+
+@router.message(AdminStates.broadcast)
+async def handle_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await state.clear()
+    users = get_all_users()
+    sent = 0
+    await message.answer(f"⏳ Xabar yuborish boshlandi. Jami foydalanuvchilar: {len(users)} ta...")
+    for user_id in users:
+        try:
+            await message.send_copy(chat_id=user_id)
+            sent += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            pass
+    await message.answer(f"✅ Xabar yuborish yakunlandi!\n\nMuvaffaqiyatli yetib bordi: {sent} ta")
 
 @router.callback_query(F.data.startswith("del_"))
 async def cb_delete(call: CallbackQuery):

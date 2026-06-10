@@ -2,7 +2,7 @@ import os
 from aiogram import Router, F
 import asyncio
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from database import add_movie, get_movie, delete_movie, increment_views, add_user, get_stats, get_all_users
@@ -24,10 +24,34 @@ class AdminStates(StatesGroup):
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     add_user(message.from_user.id)
-    await message.answer(
-        "👋 Assalomu alaykum!\n\n"
-        "Kino ko'rish uchun menga kino raqamini yuboring."
-    )
+    if message.from_user.id == ADMIN_ID:
+        markup = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="📊 Statistika"), KeyboardButton(text="✉️ Xabar yuborish")]
+            ],
+            resize_keyboard=True
+        )
+        await message.answer("👋 Assalomu alaykum, Admin!\n\nQuyidagi menyudan kerakli bo'limni tanlang:", reply_markup=markup)
+    else:
+        await message.answer(
+            "👋 Assalomu alaykum!\n\n"
+            "Kino ko'rish uchun menga kino raqamini yuboring."
+        )
+
+@router.message(F.text == "📊 Statistika")
+async def btn_stat(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    users_count, movies_count = get_stats()
+    text = f"📊 <b>Bot Statistikasi:</b>\n\n👥 Umumiy foydalanuvchilar: {users_count} ta\n🎬 Jami kinolar: {movies_count} ta"
+    await message.answer(text)
+
+@router.message(F.text == "✉️ Xabar yuborish")
+async def btn_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await message.answer("✉️ Xabaringizni yuboring. Barcha turdagi xabarlar qo'llab-quvvatlanadi.\n\nBekor qilish uchun /cancel ni bosing.")
+    await state.set_state(AdminStates.broadcast)
 
 # Admin sends a video -> save it to DB
 @router.message(F.video)

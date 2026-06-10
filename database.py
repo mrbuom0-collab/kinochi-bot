@@ -12,6 +12,11 @@ def init_db():
             views INTEGER DEFAULT 0
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY
+        )
+    ''')
     cursor.execute("SELECT COUNT(*) FROM movies")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO movies (id, file_id, caption) VALUES (99, 'dummy', '')")
@@ -51,3 +56,20 @@ def delete_movie(movie_id):
     conn.commit()
     conn.close()
     return deleted
+
+def add_user(user_id):
+    conn = sqlite3.connect('movies.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+    conn.commit()
+    conn.close()
+
+def get_stats():
+    conn = sqlite3.connect('movies.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM users")
+    users_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM movies WHERE id != 99")
+    movies_count = cursor.fetchone()[0]
+    conn.close()
+    return users_count, movies_count

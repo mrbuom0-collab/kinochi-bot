@@ -2,7 +2,7 @@ import os
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from database import add_movie, get_movie, delete_movie, increment_views
+from database import add_movie, get_movie, delete_movie, increment_views, add_user, get_stats
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +17,7 @@ CHANNEL_ID = os.getenv("CHANNEL_ID", "-1003980224305")
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
+    add_user(message.from_user.id)
     await message.answer(
         "👋 Assalomu alaykum!\n\n"
         "Kino ko'rish uchun menga kino raqamini yuboring."
@@ -48,6 +49,7 @@ async def handle_video(message: Message):
 # User sends a number -> fetch video from DB
 @router.message(F.text)
 async def handle_movie_code(message: Message):
+    add_user(message.from_user.id)
     text = message.text.strip()
     if text.isdigit():
         if CHANNEL_ID and message.from_user.id != ADMIN_ID:
@@ -110,6 +112,19 @@ async def cmd_delete(message: Message):
         await message.answer(f"✅ {movie_id} - raqamli kino muvaffaqiyatli o'chirildi.")
     else:
         await message.answer(f"❌ {movie_id} - raqamli kino topilmadi.")
+
+@router.message(Command("stat"))
+async def cmd_stat(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    users_count, movies_count = get_stats()
+    text = (
+        f"📊 <b>Bot Statistikasi:</b>\n\n"
+        f"👥 Umumiy foydalanuvchilar: {users_count} ta\n"
+        f"🎬 Jami kinolar: {movies_count} ta"
+    )
+    await message.answer(text)
 
 @router.callback_query(F.data.startswith("del_"))
 async def cb_delete(call: CallbackQuery):
